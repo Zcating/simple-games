@@ -1,0 +1,17 @@
+<div class="wrapper">
+    <button class="mine-reset-btn" (click)="resetClicked()">Reset</button>
+    <div class="mine-container">
+        <div
+            class="mine-block"
+            [ngClass]="getMineBlockCssClass(item)"
+            *ngFor="let item of (blocks$ | async); let i = index;" 
+            (click)="mineClicked(i)"
+        >
+            <span *ngIf="!isDebugMode && item.isFound && item.nearestMinesCount">{{item.nearestMinesCount}}</span>
+            <span *ngIf="isDebugMode">{{item.nearestMinesCount}} {{item.isMine}}</span>
+        </div>
+    </div>
+</div>
+<div>
+    
+</div>
