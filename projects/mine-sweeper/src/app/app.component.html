@@ -1,6 +1,6 @@
 <div class="wrapper">
     <button class="mine-reset-btn" (click)="resetClicked()">Reset</button>
-    <div class="mine-container">
+    <div class="mine-container" [ngStyle]="containerStyle">
         <div
             class="mine-block"
             [ngClass]="getMineBlockCssClass(item)"

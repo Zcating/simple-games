@@ -9,11 +9,10 @@ export interface IMineBlock {
 
 @Injectable({
     providedIn: 'root'
-
 })
-export class MineGameService {
+export class MineSweeperService {
 
-    private _isStarted = false;
+    private _isStarted = new BehaviorSubject<boolean>(false);
 
     private _isLost = new BehaviorSubject<boolean>(false);
 
@@ -21,16 +20,17 @@ export class MineGameService {
 
     private _mineBlocks = new BehaviorSubject<IMineBlock[]>([]);
 
-    private _mineSqures = new BehaviorSubject(10);
-
+    private _side = new BehaviorSubject(10);
 
     mineCount = 20;
 
-    get mineSqures$() { return this._mineSqures.asObservable(); }
 
-    get mineSqures() { return this._mineSqures.value; }
 
-    set mineSqures(value: number) { this._mineSqures.next(value); }
+    get side() { return this._side.value; }
+
+    set side(value: number) { this._side.next(value); }
+
+    get side$() { return this._side.asObservable(); }
 
     get mineBlocks() { return this._mineBlocks.value; }
 
@@ -44,19 +44,21 @@ export class MineGameService {
 
     get isWon$() { return this._isWon.asObservable(); }
 
+    get isStarted() { return this._isStarted.value; }
 
-    get isStarted() { return this._isStarted; }
+    get isStarted$() { return this._isStarted.asObservable() }
 
     constructor() {
-        this._mineSqures.subscribe((value) => {
+        this._side.subscribe((value) => {
             this._mineBlocks.next(this.createMineBlocks(value));
         });
     }
 
     start() {
-        this._mineBlocks.next(this.createMineBlocks(this.mineSqures));
+        this._mineBlocks.next(this.createMineBlocks(this.side));
         this._isLost.next(false);
-        this._isStarted = false;
+        this._isStarted.next(false);
+        this._isWon.next(false);
     }
 
     canDoNext(index: number): boolean {
@@ -64,10 +66,10 @@ export class MineGameService {
             return false;
         }
 
-        if (this._isStarted) {
+        if (this.isStarted) {
             this._isLost.next(this.testIsMine(index))
         } else {
-            this._isStarted = true;
+            this._isStarted.next(true);
             this.prepare(index);
         }
 
@@ -78,8 +80,7 @@ export class MineGameService {
 
     private prepare(index: number) {
         const blocks = [...this._mineBlocks.value];
-        const targetBlock = blocks[index];
-        if (!targetBlock) {
+        if (!blocks[index]) {
             throw Error('Out of index.');
         }
         blocks[index] = { isMine: false, isFound: true, nearestMinesCount: 0 };
@@ -89,14 +90,14 @@ export class MineGameService {
             blocks[num] = { isMine: true, isFound: false, nearestMinesCount: 0 };
         }
 
-        const mineSqures = this.mineSqures;
-        const transform = this.transformToIndex(mineSqures);
+        const side = this.side;
+        const transform = this.transformToIndex(side);
 
-        for (let i = 0; i < mineSqures; i++) {
-            for (let j = 0; j < mineSqures; j++) {
+        for (let i = 0; i < side; i++) {
+            for (let j = 0; j < side; j++) {
                 const index = transform(i, j);
-
-                if (blocks[index].isMine) {
+                const block = blocks[index];
+                if (block.isMine) {
                     continue;
                 }
 
@@ -106,12 +107,11 @@ export class MineGameService {
                         nearestMinesCount += this.getMineCount(blocks[transform(i + x, j + y)]);
                     }
                 }
-
-                blocks[index] = { ...blocks[index], nearestMinesCount };
+                blocks[index] = { ...block, nearestMinesCount };
             }
         }
         if (blocks[index].nearestMinesCount === 0) {
-            this.zeroCountsClean(blocks, index, this.transformToIndex(this.mineSqures));
+            this.cleanZeroCountBlock(blocks, index, this.transformToIndex(this.side));
         }
 
         this._mineBlocks.next(blocks);
@@ -131,7 +131,7 @@ export class MineGameService {
                 }
             }
         } else if (!theBlock.nearestMinesCount) {
-            this.zeroCountsClean(blocks, index, this.transformToIndex(this.mineSqures));
+            this.cleanZeroCountBlock(blocks, index, this.transformToIndex(this.side));
         }
 
         this._mineBlocks.next(blocks);
@@ -139,10 +139,10 @@ export class MineGameService {
         return theBlock.isMine;
     }
 
-    private zeroCountsClean(blocks: IMineBlock[], index: number, transform: (x: number, y: number) => number) {
-        const i = index % this.mineSqures;
-        const j = Math.floor(index / this.mineSqures);
-        console.log(i, j, index);
+    // clean all block which 'nearestMinesCount' is zero
+    private cleanZeroCountBlock(blocks: IMineBlock[], index: number, transform: (x: number, y: number) => number) {
+        const i = index % this.side;
+        const j = Math.floor(index / this.side);
         for (let x = -1; x <= 1; x++) {
             for (let y = -1; y <= 1; y++) {
                 const currentIndex = transform(i + x, j + y);
@@ -152,27 +152,27 @@ export class MineGameService {
                 }
                 blocks[currentIndex] = { ...block, isFound: true };
                 if (block.nearestMinesCount === 0) {
-                    this.zeroCountsClean(blocks, currentIndex, transform);
+                    this.cleanZeroCountBlock(blocks, currentIndex, transform);
                 }
             }
         }
-
     }
 
 
+    // verify if the player is vitory by caculating if count of remaining mine blocks is equal to the mines count.
     private vitoryVerify(blocks: IMineBlock[], mineCount: number) {
-
-        return blocks.reduce((prev, current, currentIndex) => {
+        return blocks.reduce((prev, current) => {
             return !current.isMine && current.isFound ? prev + 1 : prev;
         }, 0) === blocks.length - mineCount;
 
     }
 
-    private generateRandomNumbers(count: number, interval: number, ignoreNumber: number) {
+    // generate unique random numbers bewteen [0, section), while ignoring the 'targetNumber'
+    private generateRandomNumbers(count: number, section: number, targetNumber: number) {
         const arr = [];
         while (arr.length < count) {
-            const r = Math.floor(Math.random() * 100) % interval;
-            if (arr.indexOf(r) === -1 && r != ignoreNumber) {
+            const r = Math.floor(Math.random() * 100) % section;
+            if (arr.indexOf(r) === -1 && r != targetNumber) {
                 arr.push(r);
             }
         }

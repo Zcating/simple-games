@@ -1,9 +1,9 @@
 {
   "name": "simple-games",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start:ms": "ng serve mine-sweeper",
     "build": "ng build",
     "test": "ng test",
     "lint": "ng lint",

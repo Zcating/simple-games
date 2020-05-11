@@ -1,8 +1,8 @@
-import { Component, OnInit, ViewChildren, QueryList, ElementRef } from '@angular/core';
+import { Component, OnInit, ViewChildren, QueryList, ElementRef, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
-import { MineGameService, IMineBlock } from './mine-game.service';
+import { MineSweeperService, IMineBlock } from './mine-sweeper.service';
 
 
 
@@ -11,23 +11,31 @@ import { MineGameService, IMineBlock } from './mine-game.service';
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.scss']
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
 
-    isDebugMode = false;
+    isDebugMode = true;
 
-    colorMap: { [key in number]: string } = { 
-        [0x00]: 'mine-block-is-unknown', 
-        [0x01]: 'mine-block-is-found', 
-        [0x03]: 'mine-block-is-mine' 
+    colorMap: { [key in number]: string } = {
+        [0x00]: 'mine-block-is-unknown',
+        [0x01]: 'mine-block-is-found',
+        [0x03]: 'mine-block-is-mine'
     };
 
     destroy$ = new Subject<boolean>();
 
+    containerStyle = {
+        'grid-template-columns': '',
+        'grid-template-rows': ''
+    };
+
 
     get blocks$() { return this.gameService.mineBlocks$; }
 
+    get side() {
+        return this.gameService.side;
+    }
 
-    constructor(private gameService: MineGameService) {
+    constructor(private gameService: MineSweeperService, private gameService2: MineSweeperService) {
     }
 
     ngOnInit() {
@@ -38,10 +46,20 @@ export class AppComponent implements OnInit {
         });
 
         this.gameService.isLost$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
-            if (this.gameService.isLost) {
+            if (value) {
                 alert('Game Over, please restart.');
             }
         });
+
+        this.gameService.side$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
+            this.containerStyle["grid-template-columns"] = `repeat(${value}, 60px)`;
+            this.containerStyle["grid-template-rows"] = `repeat(${value}, 60px)`;
+        });
+    }
+
+    ngOnDestroy() {
+        this.destroy$.next();
+        this.destroy$.complete();
     }
 
     mineClicked(index: number) {
@@ -68,5 +86,3 @@ export class AppComponent implements OnInit {
         return this.colorMap[isFoundTag | isMineTag];
     }
 }
-
-
