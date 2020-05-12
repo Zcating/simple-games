@@ -1,8 +1,8 @@
 import { Component, OnInit, ViewChildren, QueryList, ElementRef, OnDestroy } from '@angular/core';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { takeUntil, take } from 'rxjs/operators';
 
-import { MineSweeperService, IMineBlock } from './mine-sweeper.service';
+import { MineSweeperService, IMineBlock, GameState } from './mine-sweeper.service';
 
 
 
@@ -15,42 +15,38 @@ export class AppComponent implements OnInit, OnDestroy {
 
     isDebugMode = true;
 
-    colorMap: { [key in number]: string } = {
+    readonly blockClassMap: { readonly [key in number]: string } = {
         [0x00]: 'mine-block-is-unknown',
         [0x01]: 'mine-block-is-found',
         [0x03]: 'mine-block-is-mine'
     };
 
-    destroy$ = new Subject<boolean>();
+    readonly destroy$ = new Subject<boolean>();
 
-    containerStyle = {
+    readonly containerStyle = {
         'grid-template-columns': '',
         'grid-template-rows': ''
     };
 
+    get state$() { return this.gameService.state$; }
 
     get blocks$() { return this.gameService.mineBlocks$; }
 
-    get side() {
-        return this.gameService.side;
-    }
+    get side() { return this.gameService.side; }
+
 
     constructor(private gameService: MineSweeperService, private gameService2: MineSweeperService) {
     }
 
     ngOnInit() {
-        this.gameService.isWon$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
-            if (value) {
+
+        this.gameService.state$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
+            if (value === GameState.LOST) {
+                alert('Game Over, please restart.');
+            } else if (value === GameState.WIN) {
                 alert('You win');
             }
         });
-
-        this.gameService.isLost$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
-            if (value) {
-                alert('Game Over, please restart.');
-            }
-        });
-
         this.gameService.side$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
             this.containerStyle["grid-template-columns"] = `repeat(${value}, 60px)`;
             this.containerStyle["grid-template-rows"] = `repeat(${value}, 60px)`;
@@ -64,12 +60,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
     mineClicked(index: number) {
         if (!this.gameService.canDoNext(index)) {
-            if (this.gameService.isLost) {
-                alert('Game Over, please restart.');
-            }
-            if (this.gameService.isWon) {
-                alert('You win');
-            }
         }
     }
 
@@ -83,6 +73,6 @@ export class AppComponent implements OnInit, OnDestroy {
         const isFoundTag = block.isFound ? 1 : 0;
         // 0010
         const isMineTag = block.isMine ? 2 : 0;
-        return this.colorMap[isFoundTag | isMineTag];
+        return this.blockClassMap[isFoundTag | isMineTag];
     }
 }

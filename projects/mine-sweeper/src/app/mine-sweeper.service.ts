@@ -1,6 +1,13 @@
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from 'rxjs';
 
+export enum GameState {
+    BEGINING = 0x00,
+    PLAYING = 0x01,
+    WIN = 0x02,
+    LOST = 0x03,
+}
+
 export interface IMineBlock {
     readonly isMine: boolean;
     readonly nearestMinesCount: number;
@@ -12,15 +19,11 @@ export interface IMineBlock {
 })
 export class MineSweeperService {
 
-    private _isStarted = new BehaviorSubject<boolean>(false);
-
-    private _isLost = new BehaviorSubject<boolean>(false);
-
-    private _isWon = new BehaviorSubject<boolean>(false);
-
     private _mineBlocks = new BehaviorSubject<IMineBlock[]>([]);
 
     private _side = new BehaviorSubject(10);
+
+    private _state = new BehaviorSubject<GameState>(GameState.PLAYING);
 
     mineCount = 20;
 
@@ -36,17 +39,9 @@ export class MineSweeperService {
 
     get mineBlocks$() { return this._mineBlocks.asObservable(); }
 
-    get isLost() { return this._isLost.value; }
+    get state() { return this._state.value; }
 
-    get isLost$() { return this._isLost.asObservable(); }
-
-    get isWon() { return this._isWon.value; }
-
-    get isWon$() { return this._isWon.asObservable(); }
-
-    get isStarted() { return this._isStarted.value; }
-
-    get isStarted$() { return this._isStarted.asObservable() }
+    get state$() { return this._state.asObservable(); }
 
     constructor() {
         this._side.subscribe((value) => {
@@ -56,24 +51,32 @@ export class MineSweeperService {
 
     start() {
         this._mineBlocks.next(this.createMineBlocks(this.side));
-        this._isLost.next(false);
-        this._isStarted.next(false);
-        this._isWon.next(false);
+        this._state.next(GameState.BEGINING);
     }
 
     canDoNext(index: number): boolean {
-        if (this.isLost || this.isWon) {
-            return false;
-        }
+        switch (this.state) {
+            case GameState.LOST:
+            case GameState.WIN:
+                return false;
 
-        if (this.isStarted) {
-            this._isLost.next(this.testIsMine(index))
-        } else {
-            this._isStarted.next(true);
-            this.prepare(index);
-        }
+            case GameState.BEGINING:
+                this.prepare(index);
+                this._state.next(GameState.PLAYING);
+                break;
 
-        this._isWon.next(this.vitoryVerify(this.mineBlocks, this.mineCount));
+            case GameState.PLAYING:
+                if (this.testIsMine(index)) {
+                    this._state.next(GameState.LOST);
+                }
+                break;
+
+            default:
+                break;
+        }
+        if (this.vitoryVerify()) {
+            this._state.next(GameState.WIN);
+        }
 
         return true;
     }
@@ -160,10 +163,10 @@ export class MineSweeperService {
 
 
     // verify if the player is vitory by caculating if count of remaining mine blocks is equal to the mines count.
-    private vitoryVerify(blocks: IMineBlock[], mineCount: number) {
-        return blocks.reduce((prev, current) => {
+    private vitoryVerify() {
+        return this.mineBlocks.reduce((prev, current) => {
             return !current.isMine && current.isFound ? prev + 1 : prev;
-        }, 0) === blocks.length - mineCount;
+        }, 0) === this.mineBlocks.length - this.mineCount;
 
     }
 
