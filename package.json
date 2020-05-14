@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start:ms": "ng serve mine-sweeper",
-    "build:ms": "ng build mine-sweeper --stats-json",
+    "build:ms": "ng build mine-sweeper --prod",
     "test:ms": "ng test mine-sweeper",
     "lint": "ng lint",
     "e2e": "ng e2e",
