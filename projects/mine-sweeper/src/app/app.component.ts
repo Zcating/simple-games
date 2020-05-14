@@ -2,8 +2,8 @@ import { Component, OnInit, ViewChildren, QueryList, ElementRef, OnDestroy } fro
 import { Subject } from 'rxjs';
 import { takeUntil, take } from 'rxjs/operators';
 
-import { MineSweeperService, IMineBlock, GameState } from './mine-sweeper.service';
-
+import { MineSweeperService } from './mine-sweeper.service';
+import { GameState, IMineBlock } from './model';
 
 
 @Component({
@@ -34,8 +34,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
     get side() { return this.gameService.side; }
 
+    set side(value: number) { this.gameService.side = value; }
 
-    constructor(private gameService: MineSweeperService, private gameService2: MineSweeperService) {
+    constructor(private gameService: MineSweeperService) {
     }
 
     ngOnInit() {
@@ -59,8 +60,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     mineClicked(index: number) {
-        if (!this.gameService.canDoNext(index)) {
-        }
+        this.gameService.doNext(index);
     }
 
     resetClicked() {

@@ -1,17 +1,17 @@
 import { Injectable } from "@angular/core";
 import { BehaviorSubject } from 'rxjs';
+import { IMineBlock, GameState } from './model';
 
-export enum GameState {
-    BEGINING = 0x00,
-    PLAYING = 0x01,
-    WIN = 0x02,
-    LOST = 0x03,
-}
 
-export interface IMineBlock {
-    readonly isMine: boolean;
-    readonly nearestMinesCount: number;
-    readonly isFound: boolean;
+class MineSweeperState {
+
+    mineBlocks: IMineBlock[] = [];
+
+    side: number = 10;
+
+    state: GameState = GameState.PLAYING;
+
+    mineCount = 0;
 }
 
 @Injectable({
@@ -19,29 +19,31 @@ export interface IMineBlock {
 })
 export class MineSweeperService {
 
-    private _mineBlocks = new BehaviorSubject<IMineBlock[]>([]);
+    private readonly _mineBlocks = new BehaviorSubject<IMineBlock[]>([]);
 
-    private _side = new BehaviorSubject(10);
+    private readonly _side = new BehaviorSubject(10);
 
-    private _state = new BehaviorSubject<GameState>(GameState.PLAYING);
+    private readonly _state = new BehaviorSubject<GameState>(GameState.PLAYING);
 
-    mineCount = 20;
+    private readonly _mineCount = new BehaviorSubject<number>(0);
 
+    readonly side$ = this._side.asObservable();
 
+    readonly mineBlocks$ = this._mineBlocks.asObservable();
+
+    readonly state$ = this._state.asObservable();
+
+    readonly mineCount$ = this._mineCount.asObservable();
 
     get side() { return this._side.value; }
 
     set side(value: number) { this._side.next(value); }
 
-    get side$() { return this._side.asObservable(); }
-
     get mineBlocks() { return this._mineBlocks.value; }
-
-    get mineBlocks$() { return this._mineBlocks.asObservable(); }
 
     get state() { return this._state.value; }
 
-    get state$() { return this._state.asObservable(); }
+    get mineCount() { return this._mineCount.value; }
 
     constructor() {
         this._side.subscribe((value) => {
@@ -54,12 +56,8 @@ export class MineSweeperService {
         this._state.next(GameState.BEGINING);
     }
 
-    canDoNext(index: number): boolean {
+    doNext(index: number) {
         switch (this.state) {
-            case GameState.LOST:
-            case GameState.WIN:
-                return false;
-
             case GameState.BEGINING:
                 this.prepare(index);
                 this._state.next(GameState.PLAYING);
@@ -71,14 +69,15 @@ export class MineSweeperService {
                 }
                 break;
 
+            case GameState.LOST:
+            case GameState.WIN:
             default:
+                this._state.next(this.state);
                 break;
         }
         if (this.vitoryVerify()) {
             this._state.next(GameState.WIN);
         }
-
-        return true;
     }
 
     private prepare(index: number) {
@@ -94,11 +93,10 @@ export class MineSweeperService {
         }
 
         const side = this.side;
-        const transform = this.transformToIndex(side);
 
         for (let i = 0; i < side; i++) {
             for (let j = 0; j < side; j++) {
-                const index = transform(i, j);
+                const index = this.transformToIndex(i, j);
                 const block = blocks[index];
                 if (block.isMine) {
                     continue;
@@ -107,14 +105,14 @@ export class MineSweeperService {
                 let nearestMinesCount = 0;
                 for (let x = -1; x <= 1; x++) {
                     for (let y = -1; y <= 1; y++) {
-                        nearestMinesCount += this.getMineCount(blocks[transform(i + x, j + y)]);
+                        nearestMinesCount += this.getMineCount(blocks[this.transformToIndex(i + x, j + y)]);
                     }
                 }
                 blocks[index] = { ...block, nearestMinesCount };
             }
         }
         if (blocks[index].nearestMinesCount === 0) {
-            this.cleanZeroCountBlock(blocks, index, this.transformToIndex(this.side));
+            this.cleanZeroCountBlock(blocks, index);
         }
 
         this._mineBlocks.next(blocks);
@@ -134,7 +132,7 @@ export class MineSweeperService {
                 }
             }
         } else if (!theBlock.nearestMinesCount) {
-            this.cleanZeroCountBlock(blocks, index, this.transformToIndex(this.side));
+            this.cleanZeroCountBlock(blocks, index);
         }
 
         this._mineBlocks.next(blocks);
@@ -143,19 +141,19 @@ export class MineSweeperService {
     }
 
     // clean all block which 'nearestMinesCount' is zero
-    private cleanZeroCountBlock(blocks: IMineBlock[], index: number, transform: (x: number, y: number) => number) {
+    private cleanZeroCountBlock(blocks: IMineBlock[], index: number) {
         const i = index % this.side;
         const j = Math.floor(index / this.side);
         for (let x = -1; x <= 1; x++) {
             for (let y = -1; y <= 1; y++) {
-                const currentIndex = transform(i + x, j + y);
+                const currentIndex = this.transformToIndex(i + x, j + y);
                 const block = blocks[currentIndex];
                 if (currentIndex === index || !block || block.isFound || block.isMine) {
                     continue;
                 }
                 blocks[currentIndex] = { ...block, isFound: true };
-                if (block.nearestMinesCount === 0) {
-                    this.cleanZeroCountBlock(blocks, currentIndex, transform);
+                if (blocks[currentIndex].nearestMinesCount === 0) {
+                    this.cleanZeroCountBlock(blocks, currentIndex);
                 }
             }
         }
@@ -186,13 +184,12 @@ export class MineSweeperService {
         return (new Array(count * count)).fill({ isMine: false, nearestMinesCount: 0, isFound: false });
     }
 
-    private transformToIndex(count: number) {
-        return (x: number, y: number) => {
-            if (x < 0 || x >= count || y < 0 || y >= count) {
-                return -1;
-            }
-            return y * count + x;
+    private transformToIndex(x: number, y: number) {
+        const count = this.side;
+        if (x < 0 || x >= count || y < 0 || y >= count) {
+            return -1;
         }
+        return y * count + x;
     }
 
     private getMineCount(block: IMineBlock | undefined) {
