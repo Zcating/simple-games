@@ -25,7 +25,7 @@ export class MineSweeperService {
 
     private readonly _state = new BehaviorSubject<GameState>(GameState.PLAYING);
 
-    private readonly _mineCount = new BehaviorSubject<number>(0);
+    private readonly _mineCount = new BehaviorSubject<number>(10);
 
     readonly side$ = this._side.asObservable();
 
@@ -96,8 +96,8 @@ export class MineSweeperService {
 
         for (let i = 0; i < side; i++) {
             for (let j = 0; j < side; j++) {
-                const index = this.transformToIndex(i, j);
-                const block = blocks[index];
+                const innerIndex = this.transformToIndex(i, j);
+                const block = blocks[innerIndex];
                 if (block.isMine) {
                     continue;
                 }
@@ -108,7 +108,7 @@ export class MineSweeperService {
                         nearestMinesCount += this.getMineCount(blocks[this.transformToIndex(i + x, j + y)]);
                     }
                 }
-                blocks[index] = { ...block, nearestMinesCount };
+                blocks[innerIndex] = { ...block, nearestMinesCount };
             }
         }
         if (blocks[index].nearestMinesCount === 0) {

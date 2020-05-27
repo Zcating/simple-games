@@ -48,10 +48,13 @@ export class AppComponent implements OnInit, OnDestroy {
                 alert('You win');
             }
         });
+
         this.gameService.side$.pipe(takeUntil(this.destroy$)).subscribe((value) => {
-            this.containerStyle["grid-template-columns"] = `repeat(${value}, 60px)`;
-            this.containerStyle["grid-template-rows"] = `repeat(${value}, 60px)`;
+            this.containerStyle['grid-template-columns'] = `repeat(${value}, 60px)`;
+            this.containerStyle['grid-template-rows'] = `repeat(${value}, 60px)`;
         });
+
+        this.gameService.start();
     }
 
     ngOnDestroy() {
